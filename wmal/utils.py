@@ -128,6 +128,40 @@ def show():
         'neweps':       False,
     }
 
+def _playing_file_win32(players, searchdir):
+    EnumWindows(EnumWindowsProc(_foreach_window), 0)
+    
+    winregex = re.compile("(\.mkv|\.mp4|\.avi)")
+    for line in win32_hwnd_list:
+        if winregex.search(line) is not None:
+            final = line.replace('mpv - ', '')
+            final = final.replace(' - VLC media player', '')
+            return final
+    
+    return False
+    
+def _foreach_window(hwnd, lParam):
+    length = GetWindowTextLength(hwnd)
+    buff = ctypes.create_unicode_buffer(length + 1)
+    GetWindowText(hwnd, buff, length + 1)
+    win32_hwnd_list.append(buff.value)
+
+def _playing_file_posix(players, searchdir):
+    """
+    Returns the files a process is playing
+    
+    """
+    lsof = subprocess.Popen(['lsof', '-n', '-c', ''.join(['/', players, '/']), '-Fn'], stdout=subprocess.PIPE)
+    output = lsof.communicate()[0]
+    fileregex = re.compile("n(.*(\.mkv|\.mp4|\.avi))")
+    
+    for line in output.splitlines():
+        match = fileregex.match(line)
+        if match is not None:
+            return os.path.basename(match.group(1))
+    
+    return False
+
 class wmalError(Exception):
     pass
 
@@ -155,6 +189,23 @@ class DataFatal(wmalFatal):
 class APIFatal(wmalFatal):
     pass
    
+if os.name == 'nt':
+    # If we're on Windows, handle window recognition
+    win32_hwnd_list = []
+    
+    import ctypes
+    EnumWindows = ctypes.windll.user32.EnumWindows
+    EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.POINTER
+
+    (ctypes.c_int), ctypes.POINTER(ctypes.c_int))
+    GetWindowText = ctypes.windll.user32.GetWindowTextW
+    GetWindowTextLength = ctypes.windll.user32.GetWindowTextLengthW
+    
+    playing_file = _playing_file_win32
+else:
+    # Use nicer POSIX's function otherwise
+    playing_file = _playing_file_posix
+
 # Configuration defaults
 config_defaults = {
     'player': 'mpv',

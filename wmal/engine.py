@@ -634,7 +634,7 @@ class Engine:
             # Don't do anything if the engine is busy playing a file
             return None
         
-        filename = self._playing_file(self.config['tracker_process'], self.config['searchdir'])
+        filename = utils.playing_file(self.config['tracker_process'], self.config['searchdir'])
         
         if filename:
             # Do a regex to the filename to get
@@ -674,22 +674,6 @@ class Engine:
                 self.msg.warn(self.name, 'Found player but show not in list.')
         
         return None
-    
-    def _playing_file(self, players, searchdir):
-        """
-        Returns the files a process is playing
-        
-        """
-        lsof = subprocess.Popen(['lsof', '-n', '-c', ''.join(['/', players, '/']), '-Fn'], stdout=subprocess.PIPE)
-        output = lsof.communicate()[0]
-        fileregex = re.compile("n(.*(\.mkv|\.mp4|\.avi))")
-        
-        for line in output.splitlines():
-            match = fileregex.match(line)
-            if match is not None:
-                return os.path.basename(match.group(1))
-        
-        return False
         
     def list_download(self):
         """Asks the data handler to download the remote list."""
