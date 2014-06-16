@@ -56,7 +56,7 @@ class wmal(QtGui.QMainWindow):
         self.setWindowTitle('wMAL-qt')
         
         self.accountman = AccountManager()
-        self.accountman_widget = AccountWidget(None, self.accountman)
+        self.accountman_widget = AccountDialog(None, self.accountman)
         self.accountman_widget.selected.connect(self.accountman_selected)
 
         # Go directly into the application if a default account is set
@@ -104,6 +104,8 @@ class wmal(QtGui.QMainWindow):
         action_details = QtGui.QAction('Show &details...', self)
         action_details.setStatusTip('Show detailed information about the selected show.')
         action_details.triggered.connect(self.s_show_details)
+        action_add = QtGui.QAction('Add/Search from Remote', self)
+        action_add.triggered.connect(self.s_add)
         action_send = QtGui.QAction('&Send changes', self)
         action_send.setStatusTip('Upload any changes made to the list immediately.')
         action_send.triggered.connect(self.s_send)
@@ -488,6 +490,11 @@ class wmal(QtGui.QMainWindow):
         self.detailswindow.load(show)
         self.detailswindow.show()
     
+    def s_add(self):
+        self.addwindow = SearchDialog(None, self.worker)
+        self.addwindow.setModal(True)
+        self.addwindow.show()
+    
     def s_mediatype(self, action):
         index = action.data().toInt()[0]
         mediatype = self.api_info['supported_mediatypes'][index]
@@ -686,7 +693,73 @@ class DetailsDialog(QtGui.QDialog):
                 
         self.show_info.setText( info_string )
         
-class AccountWidget(QtGui.QDialog):
+class SearchDialog(QtGui.QDialog):
+    selected = QtCore.pyqtSignal(int, bool)
+    worker = None
+
+    def __init__(self, parent, worker):
+        QtGui.QDialog.__init__(self, parent)
+
+        self.worker = worker
+        
+        layout = QtGui.QVBoxLayout()
+        
+        self.setWindowTitle('Search/Add from Remote')
+        
+        # Create top layout
+        top_layout = QtGui.QHBoxLayout()
+        search_lbl = QtGui.QLabel('Search terms:')
+        search_txt = QtGui.QLineEdit()
+        search_btn = QtGui.QPushButton('Search')
+        top_layout.addWidget(search_lbl)
+        top_layout.addWidget(search_txt, 1)
+        top_layout.addWidget(search_btn)
+        
+        # Create table
+        columns = ['Title', 'Type', 'Total']
+        self.table = QtGui.QTableWidget()
+        self.table.setColumnCount(len(columns))
+        self.table.setHorizontalHeaderLabels(columns)
+        self.table.horizontalHeader().setHighlightSections(False)
+        self.table.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.table.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self.table.verticalHeader().hide()
+        self.table.setGridStyle(QtCore.Qt.NoPen)
+        self.table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        
+        # Create bottom layout
+        bottom_layout = QtGui.QHBoxLayout()
+        cancel_btn = QtGui.QPushButton('Cancel')
+        cancel_btn.clicked.connect(self.cancel)
+        add_btn = QtGui.QPushButton('Add')
+        add_btn.clicked.connect(self.add)
+        bottom_layout.addWidget(add_btn)
+        bottom_layout.addWidget(select_btn)
+
+        # Finish layout
+        layout.addLayout(top_layout)
+        layout.addWidget(self.table)
+        layout.addLayout(bottom_layout)
+        self.setLayout(layout)
+
+    def add(self, checked):
+        #try:
+        #    selected_account_num = self.table.selectedItems()[0].num
+        #    self.selected.emit(selected_account_num, self.remember_chk.isChecked())
+        #    self.close()
+        #except IndexError:
+        #    self._error("Please select a show.")
+        pass
+
+    def cancel(self, checked):
+        self.close()
+
+    def _error(self, msg):
+        QtGui.QMessageBox.critical(self, 'Error', msg, QtGui.QMessageBox.Ok)
+        
+
+class AccountDialog(QtGui.QDialog):
     selected = QtCore.pyqtSignal(int, bool)
     aborted = QtCore.pyqtSignal()
 
@@ -758,6 +831,7 @@ class AccountWidget(QtGui.QDialog):
 
     def _error(self, msg):
         QtGui.QMessageBox.critical(self, 'Error', msg, QtGui.QMessageBox.Ok)
+        
 
 class AccountItem(QtGui.QTableWidgetItem):
     """
