@@ -1,6 +1,4 @@
-# wMAL-gtk v0.2
-# Lightweight GTK based script for using data from MyAnimeList.
-# Copyright (C) 2012  z411
+# This file is part of wMAL.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +12,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 #
 
 import gobject
@@ -513,7 +510,7 @@ class wmal_gtk(object):
         
         self.show_lists[status].select(show)
 
-    def playing_show(self, show, is_playing):
+    def playing_show(self, show, is_playing, episode):
         status = show['my_status']
         self.show_lists[status].playing(show, is_playing)
             
@@ -1755,7 +1752,7 @@ class ShowSearch(gtk.Window):
         alignment.add(bottombar)
         
         self.showlist = ShowSearchView()
-        self.showlist.connect("row-activated", self.do_add)
+        self.showlist.connect("row-activated", self.do_info)
         self.showlist.get_selection().connect("changed", self.select_show)
         
         sw.add(self.showlist)

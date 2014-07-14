@@ -1,6 +1,4 @@
-# wMAL-curses v0.2
-# Lightweight urwid+curses based script for using data from MyAnimeList.
-# Copyright (C) 2012  z411
+# This file is part of wMAL.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -187,6 +185,7 @@ class wMAL_urwid(object):
         self.engine.connect_signal('playing', self.playing_show)
         self.engine.connect_signal('show_added', self.changed_list)
         self.engine.connect_signal('show_deleted', self.changed_list)
+        self.engine.connect_signal('show_synced', self.changed_show)
 
         # Engine start and list rebuildi
         self.status("Building lists...")
@@ -285,7 +284,6 @@ class wMAL_urwid(object):
     
     def do_send(self):
         self.engine.list_upload()
-        self._rebuild_all_lists();
         self.status("Ready.")
 
     def do_retrieve(self):
@@ -538,9 +536,10 @@ class wMAL_urwid(object):
             self.status('Ready.')
     
     def changed_show(self, show):
-        status = show['my_status']
-        self.lists[status].body.update_show(show)
-        self.mainloop.draw_screen()
+        if show:
+            status = show['my_status']
+            self.lists[status].body.update_show(show)
+            self.mainloop.draw_screen()
 
     def changed_show_status(self, show, old_status=None):
         self._rebuild_list(show['my_status'])
@@ -556,7 +555,7 @@ class wMAL_urwid(object):
         self.set_filter(go_filter)
         self._get_cur_list().select_show(show)
 
-    def playing_show(self, show, is_playing):
+    def playing_show(self, show, is_playing, episode=None):
         status = show['my_status']
         self.lists[status].body.playing_show(show, is_playing)
         self.mainloop.draw_screen()

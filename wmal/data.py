@@ -49,6 +49,11 @@ class Data(object):
 
     autosend_timer = None
     
+    signals = {
+                'show_synced':       None,
+                'queue_changed':     None,
+              }
+    
     def __init__(self, messenger, config, account, userconfig):
         """Checks if the config is correct and creates an API object."""
         self.msg = messenger
@@ -87,6 +92,19 @@ class Data(object):
         # Connect signals
         self.api.connect_signal('show_info_changed', self.info_update)
     
+    def _emit_signal(self, signal, *args):
+        try:
+            if self.signals[signal]:
+                self.signals[signal](*args)
+        except KeyError:
+            raise Exception("Call to undefined signal.")
+            
+    def connect_signal(self, signal, callback):
+        try:
+            self.signals[signal] = callback
+        except KeyError:
+            raise utils.DataFatal("Invalid signal.")
+        
     def set_message_handler(self, message_handler):
         self.msg = message_handler
         self.api.set_message_handler(self.msg)
@@ -212,6 +230,7 @@ class Data(object):
         
         self._save_queue()
         self._save_cache()
+        self._emit_signal('queue_changed', len(self.queue))
         self.msg.info(self.name, "Queued add for %s" % show['title'])
         
     def queue_update(self, show, key, value):
@@ -250,6 +269,7 @@ class Data(object):
         
         self._save_queue()
         self._save_cache()
+        self._emit_signal('queue_changed', len(self.queue))
         self.msg.info(self.name, "Queued update for %s" % show['title'])
         
         # Immediately process the action if necessary
@@ -292,6 +312,7 @@ class Data(object):
         
         self._save_queue()
         self._save_cache()
+        self._emit_signal('queue_changed', len(self.queue))
         self.msg.info(self.name, "Queued delete for %s" % item['title'])
     
     def queue_clear(self):
@@ -301,6 +322,7 @@ class Data(object):
         
         self.queue = []
         self._save_queue()
+        self._emit_signal('queue_changed', len(self.queue))
         self.msg.info(self.name, "Cleared queue.")
         
     def process_queue(self):
@@ -344,6 +366,9 @@ class Data(object):
                     
                     if self.showlist.get(showid):
                         self.showlist[showid]['queued'] = False
+                        self._emit_signal('show_synced', self.showlist[showid])
+                    
+                    self._emit_signal('queue_changed', len(self.queue))
                 except utils.APIError, e:
                     self.msg.warn(self.name, "Can't process %s, will leave unsynced." % show['title'])
                     self.msg.debug(self.name, "Info: %s" % e.message)

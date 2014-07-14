@@ -35,7 +35,7 @@ class libvndb(lib):
     
     api_info =  {
                   'name': 'VNDB',
-                  'version': 'v0.1',
+                  'version': 'v0.2',
                   'merge': True,
                 }
     
@@ -51,6 +51,8 @@ class libvndb(lib):
         'can_play': False,
         'statuses':  [1, 2, 3, 4, 0],
         'statuses_dict': { 1: 'Playing', 2: 'Finished', 3: 'Stalled', 4: 'Dropped', 0: 'Unknown' },
+        'score_max': 10,
+        'score_decimals': 1,
     }
     mediatypes['wishlist'] = {
         'has_progress': False,
@@ -62,6 +64,8 @@ class libvndb(lib):
         'can_play': False,
         'statuses':  [0, 1, 2, 3],
         'statuses_dict': { 0: 'High', 1: 'Medium', 2: 'Low', 3: 'Blacklist' },
+        'score_max': 10,
+        'score_decimals': 1,
     }
     
     def __init__(self, messenger, account, userconfig):
@@ -133,7 +137,7 @@ class libvndb(lib):
         (name, data) = self._sendcmd('login',
             {'protocol': 1,
              'client': 'wMAL',
-             'clientver': 0.2,
+             'clientver': self.api_info['version'],
              'username': self.username,
              'password': self.password,
              })
@@ -194,7 +198,7 @@ class libvndb(lib):
             for item in data['items']:
                 vnid = item['vn']
                 try:
-                    vns[vnid]['my_score'] = (item['vote'] / 10)
+                    vns[vnid]['my_score'] = (item['vote'] / 10.0)
                 except KeyError:
                     # Ghost vote; ignore it
                     pass

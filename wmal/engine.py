@@ -59,6 +59,8 @@ class Engine:
                 'episode_changed':  None,
                 'score_changed':    None,
                 'status_changed':   None,
+                'show_synced':      None,
+                'queue_changed':    None,
                 'playing':          None, }
     
     def __init__(self, account, message_handler=None):
@@ -94,10 +96,18 @@ class Engine:
     def _init_data_handler(self):
         # Create data handler
         self.data_handler = data.Data(self.msg, self.config, self.account, self.userconfig)
+        self.data_handler.connect_signal('show_synced', self._data_show_synced)
+        self.data_handler.connect_signal('queue_changed', self._data_queue_changed)
         
         # Record the API details
         (self.api_info, self.mediainfo) = self.data_handler.get_api_info()
     
+    def _data_show_synced(self, show):
+        self._emit_signal('show_synced', show)
+    
+    def _data_queue_changed(self, queue):
+        self._emit_signal('queue_changed', queue)
+        
     def _emit_signal(self, signal, *args):
         try:
             if self.signals[signal]:
@@ -342,14 +352,18 @@ class Engine:
         
         # Check for the correctness of the score
         try:
-            newscore = int(newscore)
+            # Use float if the mediainfo supports it
+            if self.mediainfo['score_decimals']:
+                newscore = float(newscore)
+            else:
+                newscore = int(newscore)
         except ValueError:
-            raise utils.EngineError('Score must be numeric.')
+            raise utils.EngineError('Invalid score.')
         
         # Get the show and update it
         show = self.get_show_info(showid)
         # More checks
-        if newscore > 10:
+        if newscore > self.mediainfo['score_max']:
             raise utils.EngineError('Score out of limits.')
         if show['my_score'] == newscore:
             raise utils.EngineError("Score already at %d" % newscore)
@@ -409,15 +423,20 @@ class Engine:
         self._emit_signal('show_deleted', show)
         
     def _search_video(self, titles, episode):
-        searchep = str(episode).zfill(2)
-        regex = r"(\[.+\])? ?([ \w\d\-,@.:;!\?]+) - (%s) " % searchep
         best_candidate = (None, 0)
 
         matcher = difflib.SequenceMatcher()
 
-        # Check over candidates and propose our best candidate
-        for candidate in utils.regex_find_files(regex, self.config['searchdir']):
-            matcher.set_seq1(candidate[1].lower())
+        # Check over video files and propose our best candidate
+        for (fullpath, filename) in utils.regex_find_videos('mkv|mp4|avi', self.config['searchdir']):
+            # Use our analyze function to see what's the title and episode of the file
+            (candidate_title, candidate_episode) = utils.analyze(filename)
+
+            # Skip this file if we couldn't analyze it or it isn't the episode we want
+            if not candidate_title or candidate_episode != episode:
+                continue
+            
+            matcher.set_seq1(candidate_title.lower())
 
             # We remember to compare all titles (aliases and whatnot)
             for requested_title in titles:
@@ -428,7 +447,7 @@ class Engine:
                 # better than threshold and it's better than
                 # what we've seen yet
                 if ratio > 0.7 and ratio > best_candidate[1]:
-                    best_candidate = (candidate[0], ratio)
+                    best_candidate = (fullpath, ratio)
 
         return best_candidate[0]
     
@@ -537,11 +556,11 @@ class Engine:
                     # But if we're watching a new show, let's make sure turn off
                     # the Playing flag on that one first
                     if self.last_show and self.last_show != show:
-                        self._emit_signal('playing', self.last_show, False)
+                        self._emit_signal('playing', self.last_show, False, 0)
  
 
                     self.last_show = show
-                    self._emit_signal('playing', show, True)
+                    self._emit_signal('playing', show, True, episode)
  
                     last_episode = episode
                     last_time = time.time()
@@ -591,16 +610,11 @@ class Engine:
         if filename:
             # Do a regex to the filename to get
             # the show title and episode number
-            reg = re.compile(r"(\[.+\])? ?([ \w\d\-,@.:;!\?]+) - ([ \d]+) ")
-            show_raw = filename.replace("_"," ").replace("v2","").strip()
-            show_match = reg.match(show_raw)
-            if not show_match:
+            (show_title, show_ep) = utils.analyze(filename)
+            if not show_title:
                 self.msg.warn(self.name, 'Regex error. Check logs.')
                 utils.log_error("[Regex error] Tracker: %s / Dir: %s / Processed filename: %s\n" % (self.config['tracker_process'], self.config['searchdir'], show_raw))
                 return None
-            
-            show_title = show_match.group(2).strip()
-            show_ep = int(show_match.group(3).strip())
             
             # Use difflib to see if the show title is similar to
             # one we have in the list
